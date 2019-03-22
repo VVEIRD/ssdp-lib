@@ -1,6 +1,7 @@
 package io.github.vveird.ssdp;
 
 import java.net.DatagramPacket;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -8,6 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import io.github.vveird.ssdp.SSDPStatic.SSDPType;
 
 
 /**
@@ -38,21 +41,18 @@ import java.util.regex.Pattern;
  * SOFTWARE.
  */
 public class SSDPMessage {
+    /* New line definition */ 
 
-	public static final String MESSAGE_NOTIFY = "NOTIFY";
-	public static final String MESSAGE_M_SEARCH = "M-SEARCH";
-	public static final String MESSAGE_M_SEARCH_RESPONSE = "SSDP-RESPONSE";
 	
 
-	public static final String NTS_ALIVE = "ssdp:alive";
-	public static final String NTS_BYEBYE = "ssdp:byebye";
-	
 	
 	private static long receiveTime;
 	
 	private final SSDPClient source;
 	
-    private final String ssdpType;
+    private final SSDPType ssdpType;
+    private final int ssdpResponseCode;
+    private final String ssdpResponseDescriptor;
     private final String ip;
     private final String descriptionUrl;
     private final String server;
@@ -61,8 +61,12 @@ public class SSDPMessage {
     private final String nts;
     private final Map<String, String> headers;
 
-    public SSDPMessage(String ssdpType, String ip, String descriptionUrl, String server, String serviceType, String usn, String nts, Map<String, String> headers, SSDPClient source) {
+	public SSDPMessage(SSDPType ssdpType, String ip, String descriptionUrl, String server, String serviceType,
+			String usn, String nts, Map<String, String> headers, SSDPClient source, int ssdpResponseCode,
+			String ssdpResponseDescriptor) {
     	this.ssdpType = ssdpType;
+    	this.ssdpResponseCode = ssdpResponseCode;
+    	this.ssdpResponseDescriptor = ssdpResponseDescriptor;
         this.ip = ip;
         this.descriptionUrl = descriptionUrl;
         this.server = server;
@@ -81,7 +85,7 @@ public class SSDPMessage {
      */
     public static SSDPMessage parse(DatagramPacket ssdpResult, SSDPClient source) {
         HashMap<String, String> headers = new HashMap<String, String>();
-    	String ssdpType = null;
+    	SSDPType ssdpType = null;
         Pattern pattern = Pattern.compile("(.*): (.*)");
         Pattern httpResponsePattern = Pattern.compile("^(HTTP|http)/(?<httpversion>(1|2)\\.\\d) (?<httpresponsecode>\\d{3}) (?<httpresponsedescriptor>.*)");
         Pattern ssdpPattern = Pattern.compile("(?<ssdptype>.*) \\* HTTP/(?<httpversion>.*)");
@@ -91,10 +95,10 @@ public class SSDPMessage {
         	Matcher ssdpHeader = ssdpPattern.matcher(line);
         	Matcher httpResponseHeader = httpResponsePattern.matcher(line);
         	if(ssdpHeader.matches()) {
-        		ssdpType = ssdpHeader.group("ssdptype");
+        		ssdpType = SSDPType.valueOf(ssdpHeader.group("ssdptype"));
         	}
         	else if(httpResponseHeader.matches()) {
-        		ssdpType = "SSDP-RESPONSE";
+        		ssdpType = SSDPType.SSDP_RESPONSE;
         		headers.put("HTTP-RESPONSE-STATUS-CODE", httpResponseHeader.group("httpresponsecode"));
         		headers.put("HTTP-RESPONSE-STATUS-DESC", httpResponseHeader.group("httpresponsedescriptor"));
         	}
@@ -109,6 +113,14 @@ public class SSDPMessage {
         String st = headers.get("ST") != null ? headers.get("ST") : headers.get("NT");
         String usn = headers.get("USN");
         String nts = headers.get("NTS");
+        int ssdpResponseCode = 999;
+        try {
+			ssdpResponseCode = Integer.valueOf(headers.get("HTTP-RESPONSE-STATUS-CODE"));
+		} catch (NumberFormatException e) {
+			e.printStackTrace();
+		}
+		String ssdpResponseDescriptor = headers.get("HTTP-RESPONSE-STATUS-DESC");
+		ssdpResponseDescriptor = ssdpResponseDescriptor == null ? "" : ssdpResponseDescriptor;
         headers.remove("LOCATION");
         headers.remove("SERVER");
         headers.remove("ST");
@@ -124,30 +136,32 @@ public class SSDPMessage {
                 usn,
                 nts,
                 headers,
-                source);
+                source,
+                ssdpResponseCode,
+                ssdpResponseDescriptor);
     }
     
     public boolean isMSearch() {
-    	return MESSAGE_M_SEARCH.equalsIgnoreCase(this.getSSDPType());
+    	return ssdpType == SSDPType.M_SEARCH;
     }
     
     public boolean isMSearchResponse() {
-    	return MESSAGE_M_SEARCH_RESPONSE.equalsIgnoreCase(this.getSSDPType());
+    	return ssdpType == SSDPType.SSDP_RESPONSE;
     }
     
     public boolean isNotify() {
-    	return MESSAGE_NOTIFY.equalsIgnoreCase(this.getSSDPType());
+    	return ssdpType == SSDPType.NOTIFY;
     }
     
     public boolean isAlive() {
-    	return isNotify() && NTS_ALIVE.equalsIgnoreCase(this.getNTS());
+    	return isNotify() && SSDPStatic.NTS_ALIVE.equalsIgnoreCase(this.getNTS());
     }
     
     public boolean isByeBye() {
-    	return isNotify() && NTS_BYEBYE.equalsIgnoreCase(this.getNTS());
+    	return isNotify() && SSDPStatic.NTS_BYEBYE.equalsIgnoreCase(this.getNTS());
     }
     
-    public String getSSDPType() {
+    public SSDPType getSSDPType() {
 		return ssdpType;
 	}
 
@@ -215,11 +229,11 @@ public class SSDPMessage {
     }
     
     public SSDPMessage createByeBye() {
-    	return new SSDPMessage(MESSAGE_NOTIFY, this.ip, this.descriptionUrl, this.server, this.serviceType, this.usn, NTS_BYEBYE, this.headers, this.source);
+    	return new SSDPMessage(SSDPType.NOTIFY, this.ip, this.descriptionUrl, this.server, this.serviceType, this.usn, SSDPStatic.NTS_BYEBYE, this.headers, this.source, 999, "");
     }
     
     public SSDPMessage createAlive() {
-    	return new SSDPMessage(MESSAGE_NOTIFY, this.ip, this.descriptionUrl, this.server, this.serviceType, this.usn, NTS_ALIVE, this.headers, this.source);
+    	return new SSDPMessage(SSDPType.NOTIFY, this.ip, this.descriptionUrl, this.server, this.serviceType, this.usn, SSDPStatic.NTS_ALIVE, this.headers, this.source, 999, "");
     }
 
     @Override
@@ -245,20 +259,16 @@ public class SSDPMessage {
     @Override
     public String toString() {
     	StringBuilder sb = new StringBuilder();
-    	sb.append("SSDP Pasckage: \r\n");
-    	sb.append("  SSDP Type:  " + this.getSSDPType() + "\r\n");
-    	sb.append("  IP:         " + this.getIPAddress() + "\r\n");
-    	sb.append("  Location:   " + this.getLocation() + "\r\n");
-    	sb.append("  Server:     " + this.getServer() + "\r\n");
-    	sb.append("  Servicetype " + this.getServiceType() + "\r\n");
-    	sb.append("  USN         " + this.getUSN() + "\r\n");
-    	sb.append("  Additional Headers: " + "\r\n");
-    	List<String> headers = this.getHeaders();
-    	Collections.sort(headers);
-		for (String key : headers) {
-			sb.append("    " + key + ": " + this.getHeader(key) + "\r\n");
+    	sb.append(this.getSSDPType().toString()).append((this.getSSDPType() == SSDPType.SSDP_RESPONSE ? ssdpResponseCode + " " + ssdpResponseDescriptor : "")).append(SSDPStatic.NEWLINE)
+    	.append("HOST: ").append(SSDPStatic.MULTICAST_ADDRESS).append(":").append(SSDPStatic.MULTICAST_PORT).append(SSDPStatic.NEWLINE)
+    	.append(descriptionUrl != null && !descriptionUrl.trim().isEmpty() ?  "LOCATION: " + descriptionUrl + SSDPStatic.NEWLINE: "")
+    	.append("NTS: ").append(nts).append(SSDPStatic.NEWLINE)
+    	.append(server != null && !server.trim().isEmpty() ?  "SERVER: " + server + SSDPStatic.NEWLINE: "")
+    	.append("USN: ").append(usn).append(SSDPStatic.NEWLINE)
+    	.append("NT: ").append(serviceType).append(SSDPStatic.NEWLINE);
+    	for (String header : headers.keySet()) {
+			sb.append(header).append(": ").append(headers.get(header));
 		}
-    	// TODO Auto-generated method stub
     	return sb.toString();
     }
 }

@@ -33,16 +33,12 @@ import java.net.SocketAddress;
 import java.net.SocketException; 
  
 public class SSDPClient { 
-    /* New line definition */ 
-    public static final String NEWLINE = "\r\n"; 
  
-    public static final String MULTICAST_ADDRESS = "239.255.255.250"; 
-    public static final int PORT = 1900; 
  
     /* Definitions of start line */ 
-    public static final String NOTIFY = "NOTIFY * HTTP/1.1"; 
-    public static final String MSEARCH = "M-SEARCH * HTTP/1.1"; 
-    public static final String OK = "HTTP/1.1 200 OK"; 
+//    public static final String NOTIFY = "NOTIFY * HTTP/1.1"; 
+//    public static final String MSEARCH = "M-SEARCH * HTTP/1.1"; 
+//    public static final String OK = "HTTP/1.1 200 OK"; 
  
     /* Definitions of search targets */ 
 //    public static final String DEVICE_MEDIA_SERVER_1 = "urn:schemas-upnp-org:device:MediaServer:1";  
@@ -53,10 +49,6 @@ public class SSDPClient {
 //     
 //    public static final String ST_ContentDirectory = ST + ":" + UPNP.SERVICE_CONTENT_DIRECTORY_1; 
  
-    /* Definitions of notification sub type */ 
-    public static final String ALIVE = "ssdp:alive"; 
-    public static final String BYEBYE = "ssdp:byebye"; 
-    public static final String UPDATE = "ssdp:update"; 
  
     DatagramSocket datagramSocket; 
     MulticastSocket multicastSocket; 
@@ -69,7 +61,7 @@ public class SSDPClient {
     static int MX = 5; 
  
     public SSDPClient(InetAddress source) throws IOException { 
-        this(source, new MulticastSocket(PORT), new DatagramSocket(null)); 
+        this(source, new MulticastSocket(SSDPStatic.MULTICAST_PORT), new DatagramSocket(null)); 
     } 
  
     public SSDPClient(InetAddress source, MulticastSocket mcSocket, DatagramSocket dgSocket) throws IOException { 
@@ -77,7 +69,7 @@ public class SSDPClient {
         multicastSocket = mcSocket; 
         datagramSocket = dgSocket; 
  
-        multicastGroup = new InetSocketAddress(MULTICAST_ADDRESS, PORT); 
+        multicastGroup = new InetSocketAddress(SSDPStatic.MULTICAST_ADDRESS, SSDPStatic.MULTICAST_PORT); 
         networkInterface = NetworkInterface.getByInetAddress(localInAddress); 
         multicastSocket.joinGroup(multicastGroup, networkInterface); 
  
@@ -86,8 +78,14 @@ public class SSDPClient {
     } 
  
     /** Used to send SSDP packet */ 
-    public void send(String data) throws IOException { 
+    public void sendMulticast(String data) throws IOException { 
         DatagramPacket dp = new DatagramPacket(data.getBytes(), data.length(), multicastGroup); 
+        datagramSocket.send(dp); 
+    } 
+ 
+    /** Used to send SSDP packet */ 
+    public void send(String data, InetSocketAddress destination) throws IOException { 
+        DatagramPacket dp = new DatagramPacket(data.getBytes(), data.length(), destination); 
  
         datagramSocket.send(dp); 
     } 
@@ -147,15 +145,15 @@ public class SSDPClient {
     public static String getSSDPSearchMessage(String ST) { 
         StringBuilder sb = new StringBuilder(); 
  
-        sb.append(MSEARCH + NEWLINE); 
-        sb.append("HOST: " + MULTICAST_ADDRESS + ":" + PORT + NEWLINE); 
-        sb.append("MAN: \"ssdp:discover\"" + NEWLINE); 
-        sb.append("ST: ").append(ST).append(NEWLINE); 
-        sb.append("MX: ").append(MX).append(NEWLINE); 
+        sb.append(SSDPStatic.SSDPType.M_SEARCH.toString() + SSDPStatic.NEWLINE); 
+        sb.append("HOST: " + SSDPStatic.MULTICAST_ADDRESS + ":" + SSDPStatic.MULTICAST_PORT + SSDPStatic.NEWLINE); 
+        sb.append("MAN: \"ssdp:discover\"" + SSDPStatic.NEWLINE); 
+        sb.append("ST: ").append(ST).append(SSDPStatic.NEWLINE); 
+        sb.append("MX: ").append(MX).append(SSDPStatic.NEWLINE); 
         if (ST.contains("udap")) { 
-            sb.append("USER-AGENT: UDAP/2.0" + NEWLINE); 
+            sb.append("USER-AGENT: UDAP/2.0" + SSDPStatic.NEWLINE); 
         } 
-        sb.append(NEWLINE); 
+        sb.append(SSDPStatic.NEWLINE); 
  
         return sb.toString(); 
     } 
