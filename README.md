@@ -1,0 +1,1 @@
+#This is a collection usefull SSDP classes to recieve and send SSDP messages
