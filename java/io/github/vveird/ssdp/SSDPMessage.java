@@ -1,6 +1,7 @@
 package io.github.vveird.ssdp;
 
 import java.net.DatagramPacket;
+import java.net.SocketAddress;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,7 +54,7 @@ public class SSDPMessage {
     private final SSDPType ssdpType;
     private final int ssdpResponseCode;
     private final String ssdpResponseDescriptor;
-    private final String ip;
+    private final SocketAddress ip;
     private final String descriptionUrl;
     private final String server;
     private final String serviceType;
@@ -61,7 +62,7 @@ public class SSDPMessage {
     private final String nts;
     private final Map<String, String> headers;
 
-	public SSDPMessage(SSDPType ssdpType, String ip, String descriptionUrl, String server, String serviceType,
+	public SSDPMessage(SSDPType ssdpType, SocketAddress ip, String descriptionUrl, String server, String serviceType,
 			String usn, String nts, Map<String, String> headers, SSDPClient source, int ssdpResponseCode,
 			String ssdpResponseDescriptor) {
     	this.ssdpType = ssdpType;
@@ -73,7 +74,7 @@ public class SSDPMessage {
         this.serviceType = serviceType;
         this.usn = usn;
         this.nts = nts;
-        this.headers = headers;
+        this.headers = headers != null ? headers : new HashMap<>();
         this.source = source;
         this.receiveTime = System.currentTimeMillis();
     }
@@ -95,7 +96,7 @@ public class SSDPMessage {
         	Matcher ssdpHeader = ssdpPattern.matcher(line);
         	Matcher httpResponseHeader = httpResponsePattern.matcher(line);
         	if(ssdpHeader.matches()) {
-        		ssdpType = SSDPType.valueOf(ssdpHeader.group("ssdptype"));
+        		ssdpType = SSDPType.getEnum(ssdpHeader.group("ssdptype"));
         	}
         	else if(httpResponseHeader.matches()) {
         		ssdpType = SSDPType.SSDP_RESPONSE;
@@ -115,7 +116,7 @@ public class SSDPMessage {
         String nts = headers.get("NTS");
         int ssdpResponseCode = 999;
         try {
-			ssdpResponseCode = Integer.valueOf(headers.get("HTTP-RESPONSE-STATUS-CODE"));
+    		ssdpResponseCode = headers.get("HTTP-RESPONSE-STATUS-CODE") != null ? Integer.valueOf(headers.get("HTTP-RESPONSE-STATUS-CODE")) : 999;
 		} catch (NumberFormatException e) {
 			e.printStackTrace();
 		}
@@ -129,7 +130,7 @@ public class SSDPMessage {
         headers.remove("NTS");
         return new SSDPMessage(
         		ssdpType,
-                ssdpResult.getAddress().getHostAddress(),
+                ssdpResult.getSocketAddress(),
                 location,
                 server,
                 st,
@@ -165,7 +166,7 @@ public class SSDPMessage {
 		return ssdpType;
 	}
 
-    public String getIPAddress() {
+    public SocketAddress getIpAddress() {
         return ip;
     }
 
@@ -247,27 +248,28 @@ public class SSDPMessage {
     }
 
     public String toJson() {
-        return "SSDPMessage{" +
-                "ip='" + ip + '\'' +
-                ", descriptionUrl='" + descriptionUrl + '\'' +
-                ", server='" + server + '\'' +
-                ", serviceType='" + serviceType + '\'' +
-                ", usn='" + usn + '\'' +
-                '}';
+        return "SSDPMessage{\r\n" +
+                " type='" + this.ssdpType.getType() + "\',\r\n" + 
+                " ip='" + ip + "\',\r\n" +
+                " descriptionUrl='" + descriptionUrl + "\',\r\n" +
+                " server='" + server + "\',\r\n" +
+                " serviceType='" + serviceType + "\',\r\n" +
+                " usn='" + usn + "\'\r\n" +
+                "}";
     }
     
     @Override
     public String toString() {
     	StringBuilder sb = new StringBuilder();
-    	sb.append(this.getSSDPType().toString()).append((this.getSSDPType() == SSDPType.SSDP_RESPONSE ? ssdpResponseCode + " " + ssdpResponseDescriptor : "")).append(SSDPStatic.NEWLINE)
+    	sb.append(this.getSSDPType().toString()).append((this.getSSDPType() == SSDPType.SSDP_RESPONSE ? " " + ssdpResponseCode + " " + ssdpResponseDescriptor : "")).append(SSDPStatic.NEWLINE)
     	.append("HOST: ").append(SSDPStatic.MULTICAST_ADDRESS).append(":").append(SSDPStatic.MULTICAST_PORT).append(SSDPStatic.NEWLINE)
     	.append(descriptionUrl != null && !descriptionUrl.trim().isEmpty() ?  "LOCATION: " + descriptionUrl + SSDPStatic.NEWLINE: "")
     	.append("NTS: ").append(nts).append(SSDPStatic.NEWLINE)
     	.append(server != null && !server.trim().isEmpty() ?  "SERVER: " + server + SSDPStatic.NEWLINE: "")
     	.append("USN: ").append(usn).append(SSDPStatic.NEWLINE)
-    	.append("NT: ").append(serviceType).append(SSDPStatic.NEWLINE);
+    	.append("ST: ").append(serviceType).append(SSDPStatic.NEWLINE);
     	for (String header : headers.keySet()) {
-			sb.append(header).append(": ").append(headers.get(header));
+			sb.append(header).append(": ").append(headers.get(header)).append(SSDPStatic.NEWLINE);
 		}
     	return sb.toString();
     }

@@ -2,7 +2,8 @@ package io.github.vveird.ssdp.server;
 
 import io.github.vveird.ssdp.SSDPListener;
 
-public class Service {
+public class SSDPService {
+	
 	private String ST  = null;
 	private String USN = null;
 	private String LOCATION = null;
@@ -15,7 +16,7 @@ public class Service {
 	 */
 	private int notifyInterval = 60;
 
-	public Service(String sT, String uSN, String lOCATION, SSDPListener serviceListener, int notifyInterval) {
+	public SSDPService(String sT, String uSN, String lOCATION, SSDPListener serviceListener, int notifyInterval) {
 		super();
 		this.ST = sT;
 		this.USN = uSN;
@@ -103,8 +104,8 @@ public class Service {
 			return this;
 		}
 		
-		public Service build() {
-			return new Service(ST, USN, LOCATION, serviceListener, notifyInterval);
+		public SSDPService build() {
+			return new SSDPService(ST, USN, LOCATION, serviceListener, notifyInterval);
 		}
 	}
 

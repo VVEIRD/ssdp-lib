@@ -53,7 +53,7 @@ public class SSDPStatic {
 			this.header = header;
 		}
 		
-		public static SSDPType valueOf(Object key) {
+		public static SSDPType getEnum(String key) {
 			return Arrays.stream(values()).filter(t -> t.getType().equals(key)).findFirst().orElse(null);
 		}
 	}

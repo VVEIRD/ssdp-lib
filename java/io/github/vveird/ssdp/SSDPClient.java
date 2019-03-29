@@ -81,7 +81,14 @@ public class SSDPClient {
     public void sendMulticast(String data) throws IOException { 
         DatagramPacket dp = new DatagramPacket(data.getBytes(), data.length(), multicastGroup); 
         datagramSocket.send(dp); 
-    } 
+    }
+
+	public void sendResponse(SSDPMessage msg) throws IOException {
+		String data = msg.toString();
+        DatagramPacket dp = new DatagramPacket(data.getBytes(), data.length(), msg.getIpAddress()); 
+        datagramSocket.send(dp); 
+		
+	} 
  
     /** Used to send SSDP packet */ 
     public void send(String data, InetSocketAddress destination) throws IOException { 
@@ -156,5 +163,5 @@ public class SSDPClient {
         sb.append(SSDPStatic.NEWLINE); 
  
         return sb.toString(); 
-    } 
+    }
 }
