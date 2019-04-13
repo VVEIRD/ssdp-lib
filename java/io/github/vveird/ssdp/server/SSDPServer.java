@@ -70,6 +70,18 @@ public class SSDPServer {
 		this.notifiyTasks.put(s.getUSN(), n);
 		this.notifier.scheduleAtFixedRate(n, 0, s.getNotifyInterval() * 1_000);
 	}
+	
+	public void addSSDPListener(SSDPListener listener) {
+		for (DiscoverThread discoverThread : discoveryThreads) {
+			discoverThread.addListener(listener);
+		}
+	}
+	
+	public void removeSSDPListener(SSDPListener listener) {
+		for (DiscoverThread discoverThread : discoveryThreads) {
+			discoverThread.removeListener(listener);
+		}
+	}
 
 	private class NotifyTask extends TimerTask {
 		
@@ -169,6 +181,10 @@ public class SSDPServer {
 		
 		public void addListener(SSDPListener listener) {
 			this.listeners.add(listener);
+		}
+		
+		public void removeListener(SSDPListener listener) {
+			this.listeners.remove(listener);
 		}
 		
 		private void fireSSDPEvent(SSDPMessage msg) {
