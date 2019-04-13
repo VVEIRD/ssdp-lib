@@ -82,6 +82,20 @@ public class SSDPServer {
 			discoverThread.removeListener(listener);
 		}
 	}
+	
+	/**
+	 * Sends multicast search, answers will be delivered to the SSDPListeners
+	 * @param st Service id to search for
+	 */
+	public void sendMulticastSearch(String st) {
+		for (SSDPClient ssdpClient : clients) {
+			try {
+				ssdpClient.sendMulticast(SSDPClient.getSSDPSearchMessage(st));
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
 
 	private class NotifyTask extends TimerTask {
 		
@@ -114,8 +128,10 @@ public class SSDPServer {
 	// Sub-Classes
 	//
 	private class DiscoverThread implements Runnable {
+
+		private Thread tMulticastUdp = null;
 		
-		private Thread t = null;
+		private Thread tDirectUdp = null;
 		
 		private Logger logger = LogManager.getLogger(DiscoverThread.class);
 		
@@ -127,10 +143,34 @@ public class SSDPServer {
 		
 		public DiscoverThread(SSDPClient client) {
 			this.client = client;
-			this.t= new Thread(this);
-			this.t.setDaemon(true);
-			this.t.setName("DiscoverThread Daemon " + UUID.randomUUID().toString());
-			this.t.start();
+			this.tMulticastUdp= new Thread(this);
+			this.tMulticastUdp.setDaemon(true);
+			this.tMulticastUdp.setName("DiscoverThread Multicast UDP Daemon " + UUID.randomUUID().toString());
+			this.tMulticastUdp.start();
+			
+			this.tDirectUdp= new Thread(new Runnable() {
+				
+				@Override
+				public void run() {
+					do {
+						try {
+							SSDPMessage sm = SSDPMessage.parse(client.responseReceive(), client);
+							logger.debug("=======================================");
+							logger.debug("Recieved SSDP answer:");
+							logger.debug(sm.toJson());
+							logger.debug("=======================================\r\n");
+							fireSSDPEvent(sm);
+							client.setTimeout(0);
+						} catch (IOException e) {
+							if (!(e instanceof SocketTimeoutException))
+								logger.error("Error encountered while searching for aurora lights", e);
+						}
+					} while(looping);
+				}
+			});
+			this.tDirectUdp.setDaemon(true);
+			this.tDirectUdp.setName("DiscoverThread Direct UDP Daemon " + UUID.randomUUID().toString());
+			this.tDirectUdp.start();
 		}
 		
 		public void recieveMsearch(SSDPMessage msg) {
